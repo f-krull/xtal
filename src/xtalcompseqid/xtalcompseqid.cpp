@@ -463,23 +463,23 @@ static bool cmdChainSim(const std::string &path, const std::string &list) {
       return false;
    }
 
-
-   const uint32_t entriesPerList1 = 2000;
-   const uint32_t entriesPerList2 = 2000;
+   
+   /* split to chunks of 2000x2000; use at least 4 chunks on smaller sets */
+   const uint32_t entriesPerList = std::min(2000u, (uint32_t)(pdbCodes.size() / 4));
 
    std::vector<std::pair<PdbCodes, PdbCodes> > cmpLists;
 
    /* generate lists */
-   for (uint32_t i = 0; i < pdbCodes.size(); i += entriesPerList1) {
-      for (uint32_t j = i + 1; j < pdbCodes.size(); j += entriesPerList2) {
+   for (uint32_t i = 0; i < pdbCodes.size(); i += entriesPerList) {
+      for (uint32_t j = i + 1; j < pdbCodes.size(); j += entriesPerList) {
          cmpLists.push_back(
                std::make_pair(std::vector<std::string>(),
                      std::vector<std::string>()));
 
          uint32_t end1 = std::min((uint32_t) pdbCodes.size(),
-               i + entriesPerList1);
+               i + entriesPerList);
          uint32_t end2 = std::min((uint32_t) pdbCodes.size(),
-               j + entriesPerList2);
+               j + entriesPerList);
 
          for (uint32_t k = i; k < end1; k++) {
             cmpLists.back().first.push_back(pdbCodes[k]);
