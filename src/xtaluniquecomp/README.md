@@ -5,7 +5,7 @@ Instead of a pair of protein complexes a list of protein docking complexes can b
 
 ## Usage
 ```
-xtaluniquecomp *p1* *n1* *m1* *p2* *n1* *m2*
+xtaluniquecomp p1 n1 m1 p2 n1 m2
 ```
 * p1 path to PDB structure / protein docking complex with interface n1:m1
 * n1 chains that belog to docking unit n1
