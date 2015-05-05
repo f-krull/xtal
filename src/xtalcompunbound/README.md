@@ -5,21 +5,21 @@ To avoid multiple solutions, the algorithm additionally gets one initial chain f
 
 ## Usage
   ```
- xtalcompunbound pB cB1 cB2 pU cU1
+ xtalcompunbound pdbB cB1 cB2 pdbU cU1
   ```
 
-* pB path to the structure of a potential protein docking complex 
+* pdbB path to the structure of a potential protein docking complex 
 * cB1 one chain of binding partner B1
 * cB2 one chain of binding partner B2
-* pU path to the structure of a potential unbound protein
+* pdbU path to the structure of a potential unbound protein
 * cU1 one chain corresponding to cB1
 
 Requirements to find a solution:
-* pB is a PDB structure with at leat two chains (cB1, and cB2)
+* pdbB is a PDB structure with at least two chains (cB1, and cB2)
 * cB1 and cB2 are in contact
-* pU is a PDB structure with at leat one chains (cU1)
-* pB1 has high sequence identity to cU1
-* pU has no chain with sequence identity to cB2
+* pdbU is a PDB structure with at least one chains (cU1)
+* cB1 has high sequence identity to cU1
+* pdbU has no chain with high sequence identity to cB2
 
 ## Example
 ```
