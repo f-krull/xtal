@@ -8,7 +8,7 @@ cd xtal
 make
  ```
 
-compile whithout ggc-ar:
+compile whithout gcc-ar:
  ```
 make GCC_AR=ar
  ```
