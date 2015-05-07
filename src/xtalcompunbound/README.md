@@ -17,7 +17,7 @@ To avoid multiple solutions, the algorithm additionally gets one initial chain f
 Requirements to find a solution:
 * pdbB is a PDB structure with at least two chains (cB1, and cB2)
 * cB1 and cB2 are in contact
-* pdbU is a PDB structure with at least one chains (cU1)
+* pdbU is a PDB structure with at least one chain (cU1)
 * cB1 has high sequence identity to cU1
 * pdbU has no chain with high sequence identity to cB2
 
