@@ -193,114 +193,6 @@ static bool getChainSeqDescr(const std::string &fnPdbPath,
 
 /*----------------------------------------------------------------------------*/
 
-class PdbCodeLists {
-public:
-   FILE *fList1;
-   FILE *fList2;
-   FILE *fConf;
-   const std::string m_fnOutPath;
-
-   PdbCodeLists(std::string fnOutPath) :
-         m_fnOutPath(fnOutPath) {
-      fList1 = NULL;
-      fList2 = NULL;
-      fConf = NULL;
-   }
-
-   void close() {
-      if (fList1 != NULL) {
-         fclose(fList1);
-      }
-      if (fList2 != NULL) {
-         fclose(fList2);
-      }
-      fList1 = NULL;
-      fList2 = NULL;
-   }
-
-   bool open(uint32_t u) {
-      std::string fnList1 = common::s_printf("c%04u.list1.txt", u);
-      std::string fnList2 = common::s_printf("c%04u.list2.txt", u);
-      /* open lists */
-      fList1 = fopen((m_fnOutPath + "/" + fnList1).c_str(), "w");
-      fList2 = fopen((m_fnOutPath + "/" + fnList2).c_str(), "w");
-      /* open config file */
-      fConf = fopen(
-            common::s_printf("%s/c%04u.conf", m_fnOutPath.c_str(), u).c_str(),
-            "w");
-
-      if (fList1 == NULL || fList2 == NULL || fConf == NULL) {
-         close();
-         return false;
-      }
-
-      /* write config file */
-      fprintf(fConf, "LIST1=%s\n", fnList1.c_str());
-      fprintf(fConf, "LIST2=%s\n", fnList2.c_str());
-      fclose(fConf);
-
-      return true;
-   }
-};
-
-/*----------------------------------------------------------------------------*/
-
-static int writeConfList() {
-   assert(cmd.getNumArgs() == 3);
-   assert(cmd.getArgStr(0) == "split");
-
-   const std::string fnInPdbList = cmd.getArgStr(1);
-   const std::string fnOutPath = cmd.getArgStr(2);
-
-
-   std::vector<std::string> pdbCodes = common::readList(fnInPdbList.c_str());
-
-   if (pdbCodes.size() == 0) {
-      Log::err("no pdbcodes could be read from: %s", fnInPdbList.c_str());
-      return 1;
-   }
-
-
-   uint64_t countFiles = 0;
-   const uint32_t entriesPerList1 = 1000;
-   const uint32_t entriesPerList2 = 1000;
-   PdbCodeLists lists(fnOutPath);
-
-   for (uint32_t i = 0; i < pdbCodes.size(); i+=entriesPerList1) {
-      for (uint32_t j = i+1; j < pdbCodes.size(); j+= entriesPerList2) {
-
-         if (lists.open(countFiles) == false) {
-            Log::err("unable to write to %s", fnOutPath.c_str());
-            return 1;
-         }
-         countFiles++;
-         assert(lists.fList1 != NULL);
-         assert(lists.fList2 != NULL);
-
-         uint32_t end1 = std::min((uint32_t) pdbCodes.size(),
-               i + entriesPerList1);
-         uint32_t end2 = std::min((uint32_t) pdbCodes.size(),
-               j + entriesPerList2);
-
-
-         for (uint32_t k = i; k < end1; k++) {
-            fprintf(lists.fList1, "%s\n", pdbCodes[k].c_str());
-         }
-
-         for (uint32_t l = j; l < end2; l++) {
-            fprintf(lists.fList2, "%s\n", pdbCodes[l].c_str());
-         }
-
-         lists.close();
-      }
-      Log::inf("wrote %6.3f%%", 100.0f * i / pdbCodes.size());
-   }
-   lists.close();
-   return 0;
-}
-
-/*----------------------------------------------------------------------------*/
-
 static bool cmpSim(const std::string &fnPdbPath,
       const std::vector<std::string> &list1,
       const std::vector<std::string> &list2, FILE *outfile, bool merge) {
@@ -516,19 +408,10 @@ static bool cmdChainSim(const std::string &path, const std::string &list) {
 #define CMD_SIM "sim"
 
 int XtalCompSeqId::start() {
-   if (cmd.getNumArgs() < 3 || cmd.getNumArgs() > 5) {
-		Log::err("usage: %s [PDBPATH] [PDB_LIST] [PDB_LIST] [OUTFILE]", getName());
-		Log::err("   writes all pairwise chain sequence ids to OUTFILE");
-      Log::err("usage: %s preanalyze [PDBPATH] [PDB_LIST] [OUTFILE1] [OUTFILE2]", getName());
-		Log::err("   writes chain groups to OUTFILE1 and chain connectivity to OUTFILE2");
-		Log::err("usage: %s split [PDB_LIST] [OUTDIR]", getName());
-		Log::err("   splits a list of PDB codes to chunks");
-
-
+   if (cmd.getNumArgs() != 3) {
 		Log::err("usage: %s %s [PDBPATH] [PDB_LIST]", getName(), CMD_CON);
 		Log::err("usage: %s %s [PDBPATH] [PDB_LIST]", getName(), CMD_GRP);
 		Log::err("usage: %s %s [PDBPATH] [PDB_LIST]", getName(), CMD_SIM);
-
 		return 1;
 	}
 
@@ -551,31 +434,5 @@ int XtalCompSeqId::start() {
       return cmdChainSim(path, list) ? 0 : 1;
    }
 
-   if (cmd.getNumArgs() == 3) {
-      return writeConfList();
-   }
-
-   const std::string fnPdbPath = cmd.getArgStr(0);
-   const std::string fnPdbList1 = cmd.getArgStr(1);
-   const std::string fnPdbList2 = cmd.getArgStr(2);
-   const std::string fnOutfile = cmd.getArgStr(3);
-
-   bool merge = fnOutfile != "clus_out.txt";
-
-   /* open output file */
-   FILE *outfile = fopen(fnOutfile.c_str(), "w");
-   if (outfile == NULL) {
-      Log::err("error opening output file %s", fnOutfile.c_str());
-   }
-   std::vector<std::string> list1 = common::readList(fnPdbList1.c_str());
-   if (fnPdbList1.empty() == true) {
-      Log::err("error reading list1 %s", fnPdbList1.c_str());
-   }
-   std::vector<std::string> list2 = common::readList(fnPdbList2.c_str());
-   if (fnPdbList2.empty() == true) {
-      Log::err("error reading list2 %s", fnPdbList2.c_str());
-   }
-   cmpSim(fnPdbPath, list1, list2, outfile, merge);
-   fclose(outfile);
-	return 0;
+	return 1;
 }
