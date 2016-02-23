@@ -11,6 +11,14 @@ public:
    virtual int start(int argc, char **argv);
 };
 
+class MpiTemplate : public ExecTemplate {
+public:
+	virtual ~MpiTemplate() {};
+   virtual int start(int argc, char **argv);
+};
+
+
+
 int start(ExecTemplate *e, int argc, char **argv);
 
 

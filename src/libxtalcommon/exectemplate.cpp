@@ -5,6 +5,8 @@
 #include <typeinfo>
 #include <stdlib.h>
 
+/*----------------------------------------------------------------------------*/
+
 void ExecTemplate::registerStuff() {
 }
 
@@ -33,3 +35,14 @@ int ExecTemplate::start(int argc, char **argv) {
 int start(ExecTemplate *e, int argc, char **argv) {
    return e->start(argc, argv);
 }
+
+/*----------------------------------------------------------------------------*/
+
+#include <mpi.h>
+int MpiTemplate::start(int argc, char **argv) {
+   MPI_Init (&argc, &argv);
+   int ret = ExecTemplate::start(argc, argv);
+   MPI_Finalize();
+   return ret;
+}
+

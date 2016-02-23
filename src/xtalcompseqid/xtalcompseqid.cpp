@@ -5,6 +5,7 @@
 #include "../libxtaldata/protein.h"
 #include "../libxtalcommon/seqaligner.h"
 #include "../libxtalcommon/chaininterfacetable.h"
+#include <mpi.h>
 
 #include <stdio.h>
 #include <assert.h>
@@ -15,6 +16,9 @@
 
 #define CFG_INTCUTOFF 6.0f
 #define CFG_MINUMINTFRES 11
+
+
+#define MPI_TAG_SIMRESULT 1
 
 /*----------------------------------------------------------------------------*/
 
@@ -141,28 +145,26 @@ uint32_t addChainDescr(const Protein &p, std::vector<ChainSeqDescr> &seqs, bool 
 /*----------------------------------------------------------------------------*/
 
 void compareSeq(const ChainSeqDescr &csd1, const ChainSeqDescr &csd2,
-      const UnitScore &us, FILE *f, bool cutoff = true) {
+      const UnitScore &us, std::vector<std::string> &sims, bool cutoff = true) {
    float score = getSeqScore(csd1.seq, csd2.seq, us);
    /* normalize by max score */
 
    /* normalize by smaller sequence length */
    float seqSim1 = score / csd1.seq.size();
    if (cutoff == false || seqSim1 >= SEQ_MIN_ID) {
-      #pragma omp critical (sim_print)
-      {
-         fprintf(f, "%s %c %s %c %5.3f\n", csd1.pdbId.c_str(),
-               csd1.chainGroup.at(0), csd2.pdbId.c_str(), csd2.chainGroup.at(0),
-               seqSim1);
-      }
+      char buffer[512];
+      snprintf(buffer, sizeof(buffer), "%s %c %s %c %5.3f\n", csd1.pdbId.c_str(),
+            csd1.chainGroup.at(0), csd2.pdbId.c_str(), csd2.chainGroup.at(0),
+            seqSim1);
+      sims.push_back(buffer);
    }
    float seqSim2 = score / csd2.seq.size();
    if (cutoff == false || seqSim2 >= SEQ_MIN_ID) {
-      #pragma omp critical (sim_print)
-      {
-         fprintf(f, "%s %c %s %c %5.3f\n", csd2.pdbId.c_str(),
-               csd2.chainGroup.at(0), csd1.pdbId.c_str(), csd1.chainGroup.at(0),
-               seqSim2);
-      }
+      char buffer[512];
+      snprintf(buffer, sizeof(buffer), "%s %c %s %c %5.3f\n", csd2.pdbId.c_str(),
+            csd2.chainGroup.at(0), csd1.pdbId.c_str(), csd1.chainGroup.at(0),
+            seqSim2);
+      sims.push_back(buffer);
    }
 }
 
@@ -195,17 +197,16 @@ static bool getChainSeqDescr(const std::string &fnPdbPath,
 
 static bool cmpSim(const std::string &fnPdbPath,
       const std::vector<std::string> &list1,
-      const std::vector<std::string> &list2, FILE *outfile, bool merge) {
+      const std::vector<std::string> &list2,
+      std::vector<std::string> &sims, bool merge) {
    /* read PDB lists */
    std::vector<ChainSeqDescr> seqs1;
    std::vector<ChainSeqDescr> seqs2;
 
    bool ok = true;
-   #pragma omp critical (sim_read1)
    {
       ok = ok && getChainSeqDescr(fnPdbPath, list1, seqs1, merge);
    }
-   #pragma omp critical (sim_read2)
    {
       ok = ok && getChainSeqDescr(fnPdbPath, list2, seqs2, merge);
    }
@@ -231,7 +232,7 @@ static bool cmpSim(const std::string &fnPdbPath,
          if (merge == true && (seqs1[i].pdbId < seqs2[j].pdbId) == false) {
             continue;
          }
-         compareSeq(seqs1[i], seqs2[j], us, outfile, merge);
+         compareSeq(seqs1[i], seqs2[j], us, sims, merge);
          countCurr++;
 //        if (countCurr % 1000 == 0) {
 //           Log::inf("progress: %6.2f%% (%lu/%lu) chains",
@@ -388,16 +389,35 @@ static bool cmdChainSim(const std::string &path, const std::string &list) {
    /* process lists */
    uint32_t numDone = 0;
    bool ret = true; /* wont work yet with omp */
-   #pragma omp parallel for
-   for (uint32_t i = 0; i < cmpLists.size(); i++) {
-      #pragma omp task shared(numDone)
-      {
-         ret = ret && cmpSim(path, cmpLists[i].first, cmpLists[i].second, stdout, true);
-         #pragma omp atomic
-         numDone++;
-         Log::inf("processed %6.3f%%", 100.0f * numDone / cmpLists.size());
+
+   int32_t mpiId = 0;
+   int32_t mpiSize = 0;
+   MPI_Comm_rank(MPI::COMM_WORLD, &mpiId); /* get current process id */
+   MPI_Comm_size(MPI::COMM_WORLD, &mpiSize);  /* get number of processes */
+
+   Log::inf("node %d of %d", mpiId, mpiSize);
+
+   if (mpiId == 0) {
+      char buffer[512];
+      int32_t status = 0;
+      while (true) {
+         MPI::COMM_WORLD.Recv((void*)buffer, (int)sizeof(buffer), MPI::CHAR, MPI_ANY_SOURCE, MPI_TAG_SIMRESULT);
+         printf("> %s", buffer);
+      }
+            //numDone++;
+            //Log::inf("processed %6.3f%%", 100.0f * numDone / cmpLists.size());
+   } else {
+      for (uint32_t i = 0; i < cmpLists.size(); i++) {
+         if ((int32_t)i % mpiSize == mpiId) {
+            std::vector<std::string> sims;
+            ret = ret && cmpSim(path, cmpLists[i].first, cmpLists[i].second, sims, true);
+            for (uint32_t i = 0; i < sims.size(); i++) {
+               MPI::COMM_WORLD.Send(sims[i].c_str(), sims[i].size(), MPI::CHAR, 0, MPI_TAG_SIMRESULT);
+            }
+         }
       }
    }
+
    return ret;
 }
 
@@ -414,7 +434,6 @@ int XtalCompSeqId::start() {
 		Log::err("usage: %s %s [PDBPATH] [PDB_LIST]", getName(), CMD_SIM);
 		return 1;
 	}
-
 
    if (cmd.getArgStr(0) == CMD_CON) {
       const std::string path = cmd.getArgStr(1);

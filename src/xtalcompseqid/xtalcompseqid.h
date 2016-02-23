@@ -4,7 +4,7 @@
 
 #include "../libxtalcommon/exectemplate.h"
 
-class XtalCompSeqId : public ExecTemplate {
+class XtalCompSeqId : public MpiTemplate {
 public:
    virtual ~XtalCompSeqId() {}
 protected:
