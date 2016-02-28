@@ -87,6 +87,7 @@ public:
    uint32_t cNumGaps;
    uint32_t cNumNonInterfaceChains;
    uint32_t cNumLigands;
+   uint32_t cNumS2Bonds;
 
    std::string cChainsB1;
    std::string cChainsB2x;
@@ -123,6 +124,7 @@ public:
       cNumGaps = 0;
       cNumNonInterfaceChains = 0;
       cNumLigands = 0;
+      cNumS2Bonds = 0;
 
       u1NumChains = 0;
       u1NumAddChains = 0;
@@ -171,6 +173,7 @@ public:
 
       res += common::s_printf("%2u ", cNumNonInterfaceChains);
       res += common::s_printf("%2u ", cNumLigands);
+      res += common::s_printf("%2u ", cNumS2Bonds);
 
       res += common::s_printf("%6s ", cChainsB1.c_str());
       res += common::s_printf("%6s ", cChainsB2x.c_str());
@@ -1079,6 +1082,7 @@ static UnboundMatchResult alignUnbound(const std::string &id, const std::string 
    }
 
    /* disulfide bonds */
+   std::vector<std::pair<Residue*, Residue*> > s2bonds;
    {
       std::vector<std::pair<Residue*, Residue*> > s2bonds = Chain::getS2Bonds(mint.cR(), mint.cL(), 2.3f);
       for (uint32_t i = 0; i < s2bonds.size(); i++) {
@@ -1098,6 +1102,7 @@ static UnboundMatchResult alignUnbound(const std::string &id, const std::string 
    res.cNumInterfaceChains = res.cChainsB1i.size() + res.cChainsB2i.size();
    res.cNumNonInterfaceChains = (res.cChainsB1.size() + res.cChainsB2x.size()) - res.cNumInterfaceChains;
    res.cNumLigands = cduB1B2.numCofactors();
+   res.cNumS2Bonds = s2bonds.size();
 
    res.uChainsU1s = chains2Str(cm.U1());
    res.uChainsU1x = chains2Str(cmx.U1());
