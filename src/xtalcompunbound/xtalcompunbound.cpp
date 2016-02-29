@@ -1084,7 +1084,7 @@ static UnboundMatchResult alignUnbound(const std::string &id, const std::string 
    /* disulfide bonds */
    std::vector<std::pair<Residue*, Residue*> > s2bonds;
    {
-      std::vector<std::pair<Residue*, Residue*> > s2bonds = Chain::getS2Bonds(mint.cR(), mint.cL(), 2.3f);
+      s2bonds = Chain::getS2Bonds(mint.cR(), mint.cL(), 2.3f);
       for (uint32_t i = 0; i < s2bonds.size(); i++) {
          dbg("S2 bond %s %s", resToStr(s2bonds[i].first).c_str(), resToStr(s2bonds[i].second).c_str());
       }
