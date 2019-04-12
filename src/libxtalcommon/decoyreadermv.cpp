@@ -44,7 +44,7 @@ DecoyReaderMv::DecoyReaderMv(Mol *rec, Mol *lig, const char* filename) {
 
    m->bupmol = new Mol(*m->ligand);
    m->infile.open(filename);
-   if (m->infile == NULL) {
+   if (!m->infile) {
       Log::err("DecoyReader cannot read decoy file: %s", filename);
       return;
    }

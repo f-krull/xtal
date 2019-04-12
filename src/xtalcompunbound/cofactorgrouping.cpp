@@ -20,7 +20,7 @@ bool CofactorType::readGroupDef(const char* fn) {
    std::ifstream infile(fn);
    while (infile) {
       std::string s;
-      if (getline(infile, s) == NULL) {
+      if (!getline(infile, s)) {
          break;
       }
 
@@ -33,7 +33,7 @@ bool CofactorType::readGroupDef(const char* fn) {
 
       while (ss) {
          std::string s;
-         if (getline(ss, s, ' ') == NULL) {
+         if (!getline(ss, s, ' ')) {
             break;
          }
          record.insert(s);
@@ -135,7 +135,7 @@ float getAtomCountSim(const Residue* c1, const Residue* c2) {
    int32_t diff = 0; /* total number of different atom counts */
    for (uint32_t i = 0; i < hist1.size(); i++) {
       count += hist1[i] + hist2[i];
-      diff += abs(hist1[i] - hist2[i]);
+      diff += labs(hist1[i] - hist2[i]);
    }
    float similarity = 1 - (float(diff) / count);
 

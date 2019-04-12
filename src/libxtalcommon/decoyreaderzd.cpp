@@ -49,7 +49,7 @@ DecoyReaderZd::DecoyReaderZd(Mol *rec, Mol *lig, string zdFilename) {
    }
    /* open file for reading */
    m->infile.open(zdFilename.c_str());
-   if (m->infile == NULL) {
+   if (!m->infile) {
       Log::err("ZdockReader cannot open file: %s", zdFilename.c_str());
       return;
    }

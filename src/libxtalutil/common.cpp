@@ -14,7 +14,7 @@ bool common::exists(const std::string filename) {
    std::ifstream file;
 
    file.open(filename.c_str(), std::ios::in);
-   if (file == NULL) {
+   if (!file) {
       return false;
    }
    file.close();
@@ -42,7 +42,7 @@ std::vector<std::string> common::readList(const char * filename, char comment) {
    std::string line;
 
    file.open(filename);
-   if (file != NULL) {
+   if (file) {
       while (getline((file), line)) {
          if ((line.length() > 0) && (line.at(0) != comment)) {
             ret.push_back(line);

@@ -64,7 +64,7 @@ float ContactMap::dist(const ContactMap &c2) const {
             uint32_t mb = b.m_map[i * AaMap::size + j];
             uint32_t ms = s.m_map[i * AaMap::size + j];
             if (ms < mb) {
-               diff += abs(ms - mb);
+               diff += labs(ms - mb);
             }
             count += mb;
             count += ms;
@@ -80,7 +80,7 @@ float ContactMap::dist(const ContactMap &c2) const {
            uint32_t mb = b.m_mapt[i * AaMap::size + j];
            uint32_t ms = s.m_map[i * AaMap::size + j];
            if (ms < mb) {
-              diff += abs(ms - mb);
+              diff += labs(ms - mb);
            }
            count += mb;
            count += ms;
@@ -150,7 +150,7 @@ float ContactMap3::dist(const ContactMap3 &c2) const {
          uint32_t mb = b.m_map[i];
          uint32_t ms = s.m_map[i];
          if (ms < mb) {
-            diff += abs(ms - mb);
+            diff += labs(ms - mb);
          }
          count += mb;
          count += ms;
@@ -164,7 +164,7 @@ float ContactMap3::dist(const ContactMap3 &c2) const {
          uint32_t mb = b.m_mapt[i];
          uint32_t ms = s.m_map[i];
          if (ms < mb) {
-            diff += abs(ms - mb);
+            diff += labs(ms - mb);
          }
          count += mb;
          count += ms;

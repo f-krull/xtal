@@ -379,7 +379,7 @@ void Command::readScriptfile(const string &filename) {
    string line;
 
    infile.open(filename.c_str(), ios::in);
-   if (infile == NULL) {
+   if (!infile) {
       Log::err("cannot open script file %s", filename.c_str());
       return;
    }
