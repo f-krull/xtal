@@ -1,6 +1,6 @@
 
 CXXFLAGS+=-g3 -Wall -pedantic -static-libgcc -static-libstdc++
-CXXFLAGS+=-march=native
+CXXFLAGS+=-march=native # change, if running elsewhere (core2, sandybridge, ...)
 CXXFLAGS+=-fopenmp
 CXXFLAGS+=-Ofast
 CXXFLAGS+=-flto
