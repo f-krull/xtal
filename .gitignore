@@ -1,0 +1,9 @@
+*.o
+.depend
+3rdparty/*
+src/libxtalcommon/libxtalcommon.a
+src/libxtaldata/libxtaldata.a
+src/libxtalutil/libxtalutil.a
+src/xtalcompseqid/xtalcompseqid
+src/xtalcompunbound/xtalcompunbound
+src/xtaluniquecomp/xtaluniquecomp
