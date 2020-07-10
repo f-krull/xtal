@@ -1308,14 +1308,13 @@ int XtalCompUnbound::start() {
       {
          #pragma omp parallel for
          for (uint32_t i = 0; i < candList.size(); i++) {
-            const std::string fnpBC = dnPdb + candList[i][1] + ".pdb";
-            const char nB1 = candList[i][2].at(0);
-            const char nB2 = candList[i][3].at(0);
-            const std::string fnpU1 = dnPdb + candList[i][4] + ".pdb";
-            const char nU1 = candList[i][5].at(0);
-
             #pragma omp task
             {
+               const std::string fnpBC = dnPdb + candList[i][1] + ".pdb";
+               const char nB1 = candList[i][2].at(0);
+               const char nB2 = candList[i][3].at(0);
+               const std::string fnpU1 = dnPdb + candList[i][4] + ".pdb";
+               const char nU1 = candList[i][5].at(0);
                std::string res;
                startAlignUnbound(candList[i][0].c_str(), fnpBC, nB1, nB2, fnpU1, nU1, res);
                #pragma omp critical
