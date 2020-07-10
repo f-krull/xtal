@@ -302,7 +302,7 @@ AaMap::~AaMap() {
 /*----------------------------------------------------------------------------*/
 
 AaMap& AaMap::getInstance() {
-   static std::auto_ptr<AaMap> aamap;
+   static std::unique_ptr<AaMap> aamap;
 
    #pragma omp critical (aamap_init)
    if (aamap.get() == NULL) {
