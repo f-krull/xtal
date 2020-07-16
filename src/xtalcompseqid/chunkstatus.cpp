@@ -20,6 +20,7 @@ ChunkStatus::Status ChunkStatus::init(const char* id, const char* filename, uint
   m_fn = filename;
   m_compl_inf.resize(num_chunks, 0);
   m_status = filename == NULL ? UNUSED : NOT_LOADED;
+  m_num_completed = 0;
   return m_status;
 }
 
@@ -67,13 +68,16 @@ ChunkStatus::Status ChunkStatus::load() {
     int ret = sscanf(buffer, "%*u %4s", s);
     //printf("%u -- %d %s\n", line_count, ret, s);
     if (ret == 1) {
-      m_compl_inf[line_count-num_header_lines] = strcmp(s, "done") == 0 ? 1 : 0;
+      const uint8_t done = strcmp(s, "done") == 0 ? 1 : 0;
+      m_compl_inf[line_count-num_header_lines] = done;
+      m_num_completed += done;
     }
     line_count++;
   }
   m_status = (m_id != buffer) ? ERROR_LOAD_ID : m_status;
   m_status = OK;
   fclose(f);
+  return m_status;
 }
 
 /*----------------------------------------------------------------------------*/
@@ -93,6 +97,7 @@ ChunkStatus::Status ChunkStatus::setCompleted(uint32_t id) {
       break;
     }
     m_compl_inf[id] = 1;
+    m_num_completed++;
     char *tmpfn = NULL;
     {
       std::string t = getTmpDir();
@@ -116,6 +121,10 @@ ChunkStatus::Status ChunkStatus::setCompleted(uint32_t id) {
     break;
   }
   return m_status;
+}
+
+float ChunkStatus::getProgress() const {
+  return(float(m_num_completed) / m_compl_inf.size());
 }
 
 

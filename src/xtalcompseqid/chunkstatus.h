@@ -22,9 +22,11 @@ public:
   Status load();
   bool isCompleted(uint32_t id) const;
   Status setCompleted(uint32_t id); // to be called thread-safe
+  float getProgress() const;
 private:
   std::string m_id;
   std::string m_fn;
   std::vector<char> m_compl_inf;
   Status m_status;
+  uint32_t m_num_completed;
 };

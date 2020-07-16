@@ -5,6 +5,7 @@
 #include "../libxtaldata/protein.h"
 #include "../libxtalcommon/seqaligner.h"
 #include "../libxtalcommon/chaininterfacetable.h"
+#include "chunkstatus.h"
 
 #include <stdio.h>
 #include <assert.h>
@@ -15,6 +16,10 @@
 
 #define CFG_INTCUTOFF 6.0f
 #define CFG_MINUMINTFRES 11
+
+#define CMD_CON "con"
+#define CMD_GRP "grp"
+#define CMD_SIM "sim"
 
 /*----------------------------------------------------------------------------*/
 
@@ -244,57 +249,87 @@ static bool cmpSim(const std::string &fnPdbPath,
 
 /*----------------------------------------------------------------------------*/
 
-static bool cmdChainCon(const std::string &fnPath, const std::string &fnList) {
-   /* read paths to pdb files */
-   std::vector<std::string> pdbCodeList = common::readList(fnList.c_str());
+static bool cmdChainCon(const std::string &fnPath, const std::string &fnList, 
+   const char* fnCheckpoint) {
+   std::vector<std::vector<std::string>> pdbCodeChunks;
+   {
+      /* read paths to pdb files */
+      std::vector<std::string> pdbCodeList = common::readList(fnList.c_str());
 
-   /* make sure we read something */
-   if (pdbCodeList.size() == 0) {
-      Log::err("error reading: %s", fnList.c_str());
-      return false;
+      /* make sure we read something */
+      if (pdbCodeList.size() == 0) {
+         Log::err("error reading: %s", fnList.c_str());
+         return false;
+      }
+
+      const uint32_t chunkSize = std::min(400u, (uint32_t)pdbCodeList.size() / 4);
+
+      for (size_t i = 0; i < pdbCodeList.size(); i += chunkSize) {
+         auto last = std::min(pdbCodeList.size(), i + chunkSize);
+         pdbCodeChunks.emplace_back(pdbCodeList.begin() + i, pdbCodeList.begin() + last);
+      }
+   }
+
+   ChunkStatus cs;
+   cs.init(CMD_CON, fnCheckpoint, pdbCodeChunks.size());
+   cs.load();
+   if (cs.getProgress() > 0) {
+      Log::inf("resuming at %.3f%%", cs.getProgress() * 100);
    }
 
    #pragma omp parallel for
-   for (uint32_t i = 0; i < pdbCodeList.size(); i++) {
-      Protein p;
-      /* check if we were able to read */
-      if (p.readPdb((fnPath + "/" + pdbCodeList[i] + ".pdb").c_str()) == false) {
+   for (uint32_t j = 0; j < pdbCodeChunks.size(); j++) {
+      if (cs.isCompleted(j)) {
          continue;
       }
+      auto pdbCodeList = pdbCodeChunks[j];
+      for (uint32_t i = 0; i < pdbCodeList.size(); i++) {
+         /* check if already completed */
+         Protein p;
+         /* check if we were able to read */
+         if (p.readPdb((fnPath + "/" + pdbCodeList[i] + ".pdb").c_str()) == false) {
+            continue;
+         }
 
-      /* use filename as name (pdb5) */
-      p.name() = pdbCodeList[i];
+         /* use filename as name (pdb5) */
+         p.name() = pdbCodeList[i];
 
-      IntfDefAllAtom iaa(CFG_INTCUTOFF);
-      ChainInterfaceTable citab(iaa);
-      /* create con table */
-      Chains pchains;
-      filterShortChains(p, pchains);
-      for (uint32_t k = 0; k < pchains.size(); k++) {
-         for (uint32_t l = 0; l < pchains.size(); l++) {
-            /* no chains interfacing themselves */
-            if (k == l) {
-               continue;
-            }
+         IntfDefAllAtom iaa(CFG_INTCUTOFF);
+         ChainInterfaceTable citab(iaa);
+         /* create con table */
+         Chains pchains;
+         filterShortChains(p, pchains);
+         for (uint32_t k = 0; k < pchains.size(); k++) {
+            for (uint32_t l = 0; l < pchains.size(); l++) {
+               /* no chains interfacing themselves */
+               if (k == l) {
+                  continue;
+               }
 
-            ChainInterface* cint = citab.add(pchains[k], pchains[l]);
+               ChainInterface* cint = citab.add(pchains[k], pchains[l]);
 
-            if (cint == NULL) {
-               continue;
-            }
+               if (cint == NULL) {
+                  continue;
+               }
 
-            uint32_t intSize = std::max(cint->size1, cint->size2);
+               uint32_t intSize = std::max(cint->size1, cint->size2);
 
-            if (intSize < CFG_MINUMINTFRES) {
-               continue;
-            }
+               if (intSize < CFG_MINUMINTFRES) {
+                  continue;
+               }
 
-            #pragma omp critical (sim_print)
-            {
-               printf("%s %c %c %u\n", p.name().c_str(), pchains[k]->name(),
-                     pchains[l]->name(), intSize);
+               #pragma omp critical (sim_print)
+               {
+                  printf("%s %c %c %u\n", p.name().c_str(), pchains[k]->name(),
+                        pchains[l]->name(), intSize);
+                  fflush(stdout);
+               }
             }
          }
+      }
+      #pragma omp critical (cs)
+      {
+         cs.setCompleted(j);
       }
    }
    return true;
@@ -403,15 +438,11 @@ static bool cmdChainSim(const std::string &path, const std::string &list) {
 
 /*----------------------------------------------------------------------------*/
 
-#define CMD_CON "con"
-#define CMD_GRP "grp"
-#define CMD_SIM "sim"
-
 int XtalCompSeqId::start() {
-   if (cmd.getNumArgs() != 3) {
-		Log::err("usage: %s %s [PDBPATH] [PDB_LIST]", getName(), CMD_CON);
-		Log::err("usage: %s %s [PDBPATH] [PDB_LIST]", getName(), CMD_GRP);
-		Log::err("usage: %s %s [PDBPATH] [PDB_LIST]", getName(), CMD_SIM);
+   if (cmd.getNumArgs() != 3 && cmd.getNumArgs() != 4) {
+		Log::err("usage: %s %s [PDB_PATH] [PDB_LIST] [CHECKPOINT_FILE]", getName(), CMD_CON);
+		Log::err("       %s %s [PDB_PATH] [PDB_LIST] [CHECKPOINT_FILE]", getName(), CMD_GRP);
+		Log::err("       %s %s [PDB_PATH] [PDB_LIST] [CHECKPOINT_FILE]", getName(), CMD_SIM);
 		return 1;
 	}
 
@@ -419,18 +450,21 @@ int XtalCompSeqId::start() {
    if (cmd.getArgStr(0) == CMD_CON) {
       const std::string path = cmd.getArgStr(1);
       const std::string list = cmd.getArgStr(2);
-      return cmdChainCon(path, list) ? 0 : 1;
+      const char* fncp = cmd.getArgStr(3) == "" ? NULL : cmd.getArgStr(3).c_str();
+      return cmdChainCon(path, list, fncp) ? 0 : 1;
    }
 
    if (cmd.getArgStr(0) == CMD_GRP) {
       const std::string path = cmd.getArgStr(1);
       const std::string list = cmd.getArgStr(2);
+      const char* fncp = cmd.getArgStr(3) == "" ? NULL : cmd.getArgStr(3).c_str();
       return cmdChainGrp(path, list) ? 0 : 1;
    }
 
    if (cmd.getArgStr(0) == CMD_SIM) {
       const std::string path = cmd.getArgStr(1);
       const std::string list = cmd.getArgStr(2);
+      const char* fncp = cmd.getArgStr(3) == "" ? NULL : cmd.getArgStr(3).c_str();
       return cmdChainSim(path, list) ? 0 : 1;
    }
 
