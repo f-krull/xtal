@@ -337,40 +337,68 @@ static bool cmdChainCon(const std::string &fnPath, const std::string &fnList,
 
 /*----------------------------------------------------------------------------*/
 
-static bool cmdChainGrp(const std::string &path, const std::string &list) {
-   /* read paths to pdb files */
-   std::vector<std::string> pdbCodeList = common::readList(list.c_str());
+static bool cmdChainGrp(const std::string &path, const std::string &fnList,
+      const std::string &fnCheckpoint) {
+   std::vector<std::vector<std::string>> pdbCodeChunks;
+   {
+      /* read paths to pdb files */
+      std::vector<std::string> pdbCodeList = common::readList(fnList.c_str());
 
-   /* make sure we read something */
-   if (pdbCodeList.size() == 0) {
-      Log::err("error reading: %s", list.c_str());
-      return false;
+      /* make sure we read something */
+      if (pdbCodeList.size() == 0) {
+         Log::err("error reading: %s", fnList.c_str());
+         return false;
+      }
+
+      const uint32_t chunkSize = std::min(400u, (uint32_t)pdbCodeList.size() / 4);
+
+      for (size_t i = 0; i < pdbCodeList.size(); i += chunkSize) {
+         auto last = std::min(pdbCodeList.size(), i + chunkSize);
+         pdbCodeChunks.emplace_back(pdbCodeList.begin() + i, pdbCodeList.begin() + last);
+      }
+   }
+
+   ChunkStatus cs;
+   cs.init(CMD_GRP, fnCheckpoint.c_str(), pdbCodeChunks.size());
+   cs.load();
+   if (cs.getProgress() > 0) {
+      Log::inf("resuming at %.3f%%", cs.getProgress() * 100);
    }
 
    #pragma omp parallel for
-   for (uint32_t i = 0; i < pdbCodeList.size(); i++) {
-      Protein p;
-      /* check if we were able to read */
-      if (p.readPdb((path + "/" + pdbCodeList[i] + ".pdb").c_str()) == false) {
+   for (uint32_t j = 0; j < pdbCodeChunks.size(); j++) {
+      if (cs.isCompleted(j)) {
          continue;
       }
+      auto pdbCodeList = pdbCodeChunks[j];
+      for (uint32_t i = 0; i < pdbCodeList.size(); i++) {
+         Protein p;
+         /* check if we were able to read */
+         if (p.readPdb((path + "/" + pdbCodeList[i] + ".pdb").c_str()) == false) {
+            continue;
+         }
 
-      /* use filename as name (pdb5) */
-      p.name() = pdbCodeList[i];
+         /* use filename as name (pdb5) */
+         p.name() = pdbCodeList[i];
 
-      /* create group table */
-      std::vector<ChainSeqDescr> csds;
-      addChainDescr(p, csds);
-      for (uint32_t i = 0; i < csds.size(); i++) {
-         for (uint32_t j = 0; j < csds[i].chainGroup.size(); j++) {
-            #pragma omp critical (sim_print)
-            {
-               printf("%s %c %c\n", csds[i].pdbId.c_str(), csds[i].chainGroup[j],
-                     csds[i].getGroupChain());
+         /* create group table */
+         std::vector<ChainSeqDescr> csds;
+         addChainDescr(p, csds);
+         for (uint32_t i = 0; i < csds.size(); i++) {
+            for (uint32_t j = 0; j < csds[i].chainGroup.size(); j++) {
+               #pragma omp critical (sim_print)
+               {
+                  printf("%s %c %c\n", csds[i].pdbId.c_str(), csds[i].chainGroup[j],
+                        csds[i].getGroupChain());
+                  fflush(stdout);
+               }
             }
          }
       }
-
+      #pragma omp critical (cs)
+      {
+         cs.setCompleted(j);
+      }
    }
    return true;
 }
@@ -454,8 +482,8 @@ int XtalCompSeqId::start() {
    if (cmd.getArgStr(0) == CMD_GRP) {
       const std::string path = cmd.getArgStr(1);
       const std::string list = cmd.getArgStr(2);
-      const char* fncp = cmd.getArgStr(3) == "" ? NULL : cmd.getArgStr(3).c_str();
-      return cmdChainGrp(path, list) ? 0 : 1;
+      const std::string fncp = cmd.getNumArgs() > 3 ? cmd.getArgStr(3) : std::string();
+      return cmdChainGrp(path, list, fncp) ? 0 : 1;
    }
    if (cmd.getArgStr(0) == CMD_SIM) {
       const std::string path = cmd.getArgStr(1);
