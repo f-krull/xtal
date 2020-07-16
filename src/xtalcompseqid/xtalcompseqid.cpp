@@ -250,7 +250,7 @@ static bool cmpSim(const std::string &fnPdbPath,
 /*----------------------------------------------------------------------------*/
 
 static bool cmdChainCon(const std::string &fnPath, const std::string &fnList, 
-   const char* fnCheckpoint) {
+   const std::string &fnCheckpoint) {
    std::vector<std::vector<std::string>> pdbCodeChunks;
    {
       /* read paths to pdb files */
@@ -271,7 +271,7 @@ static bool cmdChainCon(const std::string &fnPath, const std::string &fnList,
    }
 
    ChunkStatus cs;
-   cs.init(CMD_CON, fnCheckpoint, pdbCodeChunks.size());
+   cs.init(CMD_CON, fnCheckpoint.c_str(), pdbCodeChunks.size());
    cs.load();
    if (cs.getProgress() > 0) {
       Log::inf("resuming at %.3f%%", cs.getProgress() * 100);
@@ -445,28 +445,23 @@ int XtalCompSeqId::start() {
 		Log::err("       %s %s [PDB_PATH] [PDB_LIST] [CHECKPOINT_FILE]", getName(), CMD_SIM);
 		return 1;
 	}
-
-
    if (cmd.getArgStr(0) == CMD_CON) {
       const std::string path = cmd.getArgStr(1);
       const std::string list = cmd.getArgStr(2);
-      const char* fncp = cmd.getArgStr(3) == "" ? NULL : cmd.getArgStr(3).c_str();
+      const std::string fncp = cmd.getNumArgs() > 3 ? cmd.getArgStr(3) : std::string();
       return cmdChainCon(path, list, fncp) ? 0 : 1;
    }
-
    if (cmd.getArgStr(0) == CMD_GRP) {
       const std::string path = cmd.getArgStr(1);
       const std::string list = cmd.getArgStr(2);
       const char* fncp = cmd.getArgStr(3) == "" ? NULL : cmd.getArgStr(3).c_str();
       return cmdChainGrp(path, list) ? 0 : 1;
    }
-
    if (cmd.getArgStr(0) == CMD_SIM) {
       const std::string path = cmd.getArgStr(1);
       const std::string list = cmd.getArgStr(2);
       const char* fncp = cmd.getArgStr(3) == "" ? NULL : cmd.getArgStr(3).c_str();
       return cmdChainSim(path, list) ? 0 : 1;
    }
-
 	return 1;
 }
