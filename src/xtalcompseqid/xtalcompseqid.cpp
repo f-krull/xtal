@@ -158,6 +158,7 @@ void compareSeq(const ChainSeqDescr &csd1, const ChainSeqDescr &csd2,
          fprintf(f, "%s %c %s %c %5.3f\n", csd1.pdbId.c_str(),
                csd1.chainGroup.at(0), csd2.pdbId.c_str(), csd2.chainGroup.at(0),
                seqSim1);
+         fflush(stdout);
       }
    }
    float seqSim2 = score / csd2.seq.size();
@@ -167,6 +168,7 @@ void compareSeq(const ChainSeqDescr &csd1, const ChainSeqDescr &csd2,
          fprintf(f, "%s %c %s %c %5.3f\n", csd2.pdbId.c_str(),
                csd2.chainGroup.at(0), csd1.pdbId.c_str(), csd1.chainGroup.at(0),
                seqSim2);
+         fflush(stdout);
       }
    }
 }
@@ -406,7 +408,8 @@ static bool cmdChainGrp(const std::string &path, const std::string &fnList,
 /*----------------------------------------------------------------------------*/
 
 
-static bool cmdChainSim(const std::string &path, const std::string &list) {
+static bool cmdChainSim(const std::string &path, const std::string &list,
+      const std::string &fnCheckpoint) {
    /* read paths to pdb files */
    typedef std::vector<std::string> PdbCodes;
 
@@ -419,8 +422,8 @@ static bool cmdChainSim(const std::string &path, const std::string &list) {
    }
 
    
-   /* split to chunks of 2000x2000; use at least 4 chunks on smaller sets */
-   const uint32_t entriesPerList = std::min(2000u, (uint32_t)(pdbCodes.size() / 4));
+   /* split to chunks of 400x400; use at least 4 chunks on smaller sets */
+   const uint32_t entriesPerList = std::min(400u, (uint32_t)(pdbCodes.size() / 4));
 
    std::vector<std::pair<PdbCodes, PdbCodes> > cmpLists;
 
@@ -448,17 +451,30 @@ static bool cmdChainSim(const std::string &path, const std::string &list) {
       Log::inf("prepared %6.3f%%", 100.0f * i / pdbCodes.size());
    }
 
+   ChunkStatus cs;
+   cs.init(CMD_SIM, fnCheckpoint.c_str(), cmpLists.size());
+   cs.load();
+   if (cs.getProgress() > 0) {
+      Log::inf("resuming at %.3f%%", cs.getProgress() * 100);
+   }
+
    /* process lists */
    uint32_t numDone = 0;
    bool ret = true; /* wont work yet with omp */
    #pragma omp parallel for
    for (uint32_t i = 0; i < cmpLists.size(); i++) {
+      if (cs.isCompleted(i)) {
+         continue;
+      }
       #pragma omp task shared(numDone)
       {
          ret = ret && cmpSim(path, cmpLists[i].first, cmpLists[i].second, stdout, true);
-         #pragma omp atomic
-         numDone++;
-         Log::inf("processed %6.3f%%", 100.0f * numDone / cmpLists.size());
+         #pragma omp critical (cs)
+         {
+            numDone++;
+            cs.setCompleted(i);
+            Log::inf("processed %6.3f%%", cs.getProgress() * 100);
+         }
       }
    }
    return ret;
@@ -489,7 +505,7 @@ int XtalCompSeqId::start() {
       const std::string path = cmd.getArgStr(1);
       const std::string list = cmd.getArgStr(2);
       const char* fncp = cmd.getArgStr(3) == "" ? NULL : cmd.getArgStr(3).c_str();
-      return cmdChainSim(path, list) ? 0 : 1;
+      return cmdChainSim(path, list, fncp) ? 0 : 1;
    }
 	return 1;
 }
