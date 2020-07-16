@@ -504,7 +504,7 @@ int XtalCompSeqId::start() {
    if (cmd.getArgStr(0) == CMD_SIM) {
       const std::string path = cmd.getArgStr(1);
       const std::string list = cmd.getArgStr(2);
-      const char* fncp = cmd.getArgStr(3) == "" ? NULL : cmd.getArgStr(3).c_str();
+      const std::string fncp = cmd.getNumArgs() > 3 ? cmd.getArgStr(3) : std::string();
       return cmdChainSim(path, list, fncp) ? 0 : 1;
    }
 	return 1;
