@@ -341,78 +341,79 @@ IntSeqMatch::IntSeqMatch(const std::vector<UqChain> &seq1,
 
 /*----------------------------------------------------------------------------*/
 
-static bool isSimCandidate(const IntSeqMatch &int1,
-      const IntSeqMatch &int2, const float threshold) {
-   //return SCORE(int1) > threshold || SCORE(int2) > threshold;
-   bool ret = false;
-   ret = ret || int1.getSeqId() > threshold;
-   ret = ret || int2.getSeqId() > threshold;
-   ret = ret || int1.getIntScore() > threshold;
-   ret = ret || int2.getIntScore() > threshold;
-   return ret;
-}
+// static bool isSimCandidate(const IntSeqMatch &int1,
+//       const IntSeqMatch &int2, const float threshold) {
+//    //return SCORE(int1) > threshold || SCORE(int2) > threshold;
+//    bool ret = false;
+//    ret = ret || int1.getSeqId() > threshold;
+//    ret = ret || int2.getSeqId() > threshold;
+//    ret = ret || int1.getIntScore() > threshold;
+//    ret = ret || int2.getIntScore() > threshold;
+//    return ret;
+// }
 
 /*----------------------------------------------------------------------------*/
 
 float DistUqentryCmp::operator ()(const UqEntry &e1, const UqEntry &e2) const {
    /* both sequences need to overcome threshold to be considered identical */
-   const float SIM_THRESHOLD = 0.2;
+   // const float SIM_THRESHOLD = 0.2;
 
 
    /* which match is best? calculate A->A + B->B */
    IntSeqMatch max1A(e1.seq1, e2.seq1, m_ignoreSizeDiff);
    IntSeqMatch max1B(e1.seq2, e2.seq2, m_ignoreSizeDiff);
    float simAB = 0;
-   float simABseq = 0;
-   float simABint = 0;
+   // float simABseq = 0;
+   // float simABint = 0;
    simAB = IntfSeqComparer::combineIntSim(SCORE(max1A), SCORE(max1B));
-   simABseq = IntfSeqComparer::combineIntSim(max1A.getSeqId(), max1B.getSeqId());
-   simABint = IntfSeqComparer::combineIntSim(max1A.getIntScore(), max1B.getIntScore());
+   // simABseq = IntfSeqComparer::combineIntSim(max1A.getSeqId(), max1B.getSeqId());
+   // simABint = IntfSeqComparer::combineIntSim(max1A.getIntScore(), max1B.getIntScore());
 
    /* is A->B + B->A better? */
    IntSeqMatch max2A(e1.seq1, e2.seq2, m_ignoreSizeDiff);
    IntSeqMatch max2B(e1.seq2, e2.seq1, m_ignoreSizeDiff);
    float simBA = 0;
-   float simBAseq = 0;
-   float simBAint = 0;
+   // float simBAseq = 0;
+   // float simBAint = 0;
    simBA = IntfSeqComparer::combineIntSim(SCORE(max2A), SCORE(max2B));
-   simBAseq = IntfSeqComparer::combineIntSim(max2A.getSeqId(), max2B.getSeqId());
-   simBAint = IntfSeqComparer::combineIntSim(max2A.getIntScore(), max2B.getIntScore());
+   // simBAseq = IntfSeqComparer::combineIntSim(max2A.getSeqId(), max2B.getSeqId());
+   // simBAint = IntfSeqComparer::combineIntSim(max2A.getIntScore(), max2B.getIntScore());
 
    /* pick better score */
    float sim = 0;
-   enum {
-      INT_AB,
-      INT_BA
-   } intOrder = INT_AB;
+   // enum {
+   //    INT_AB,
+   //    INT_BA
+   // } intOrder = INT_AB;
 
    if (simAB >= simBA) {
       if (m_showAlignment == true) {
          max1A.debug((void*)this);
          max1B.debug((void*)this);
       }
-      intOrder = INT_AB;
+      // intOrder = INT_AB;
       sim = simAB;
    } else {
       if (m_showAlignment == true) {
          max2A.debug((void*)this);
          max2B.debug((void*)this);
       }
-      intOrder = INT_BA;
+      // intOrder = INT_BA;
       sim = simBA;
    }
 
    /* only show if at least one score is not 0 */
-   if (intOrder == INT_AB ?
-         isSimCandidate(max1A, max1B, SIM_THRESHOLD) :
-         isSimCandidate(max2A, max2B, SIM_THRESHOLD)) {
-         Log::inf("intsc: %6.3f  seqsc: %6.3f  %s %s",
-            intOrder == INT_AB ? simABint : simBAint,
-            intOrder == INT_AB ? simABseq : simBAseq,
-            (e1.name + "_" + e1.chains1 + "_" + e1.chains2).c_str(),
-            (e2.name + "_" + e2.chains1 + "_" + e2.chains2).c_str()
-            );
-   }
+   // used for publication
+   // if (intOrder == INT_AB ?
+   //       isSimCandidate(max1A, max1B, SIM_THRESHOLD) :
+   //       isSimCandidate(max2A, max2B, SIM_THRESHOLD)) {
+   //       Log::inf("intsc: %6.3f  seqsc: %6.3f  %s %s",
+   //          intOrder == INT_AB ? simABint : simBAint,
+   //          intOrder == INT_AB ? simABseq : simBAseq,
+   //          (e1.name + "_" + e1.chains1 + "_" + e1.chains2).c_str(),
+   //          (e2.name + "_" + e2.chains1 + "_" + e2.chains2).c_str()
+   //          );
+   // }
 
    /* convert similarity to distance */
    return 1.0f - sim;

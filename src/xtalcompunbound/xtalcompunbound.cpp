@@ -2,6 +2,7 @@
 #include "debugoutput.h"
 #include "../libxtalutil/command.h"
 #include "../libxtalutil/common.h"
+#include "../libxtalutil/chunkstatus.h"
 #include "../libxtaldata/protein.h"
 #include "chainmatch.h"
 #include "multichaininterface.h"
@@ -1289,6 +1290,7 @@ int XtalCompUnbound::start() {
    } else if (cmd.getNumArgs() == 2 || cmd.getNumArgs() == 3) {
       const std::string dnPdb = cmd.getArgStr(0);
       const std::string fnList = cmd.getArgStr(1);
+      const std::string fnCheckpoint = cmd.getNumArgs() > 2 ? cmd.getArgStr(2) : std::string();
 
       std::vector<std::vector<std::string> > candList;
       readTable(fnList, 6, candList);
@@ -1306,8 +1308,17 @@ int XtalCompUnbound::start() {
       /* when viewing do not process parallel */
       //const uint32_t chunkSize = cmd.var("viewer").getBool() == true ? 1 : 1024;
       {
+         ChunkStatus cs;
+         cs.init(getName(), fnCheckpoint.c_str(), candList.size());
+         cs.load();
+         if (cs.getProgress() > 0) {
+            Log::inf("resuming at %.3f%%", cs.getProgress() * 100);
+         }
          #pragma omp parallel for
          for (uint32_t i = 0; i < candList.size(); i++) {
+            if (cs.isCompleted(i)) {
+               continue;
+            }
             #pragma omp task
             {
                const std::string fnpBC = dnPdb + candList[i][1] + ".pdb";
@@ -1320,6 +1331,11 @@ int XtalCompUnbound::start() {
                #pragma omp critical
                {
                   printf("%s %s\n", candList[i][0].c_str(), res.c_str());
+                  fflush(stdout);
+                  cs.setCompleted(i);
+                  if (i%1000 == 0) {
+                     Log::inf("processed %6.3f%%", cs.getProgress() * 100);
+                  }
                }
             }
          }
