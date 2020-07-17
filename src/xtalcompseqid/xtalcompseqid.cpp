@@ -5,7 +5,7 @@
 #include "../libxtaldata/protein.h"
 #include "../libxtalcommon/seqaligner.h"
 #include "../libxtalcommon/chaininterfacetable.h"
-#include "chunkstatus.h"
+#include "../libxtalutil/chunkstatus.h"
 
 #include <stdio.h>
 #include <assert.h>
