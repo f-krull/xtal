@@ -27,7 +27,8 @@
 #include <algorithm>
 #include <memory>
 
-
+#define ENV_COF_IGNORELIST "XTAL_COF_IGNORELIST"
+#define ENV_COF_GROUPS "XTAL_COF_GROUPS"
 #define MAXSEQID 0.7
 
 /*----------------------------------------------------------------------------*/
@@ -1007,13 +1008,20 @@ static UnboundMatchResult alignUnbound(const std::string &id, const std::string 
       }
    }
 
+   // TODO: pre-read and share lists
    std::vector<std::string> cofIgnoreList;
-   assert((cofIgnoreList = common::readList("/tmp/cof_ignorelist.txt")).empty() == false && "no entries in cofactor ignore list (\"/tmp/cof_ignorelist.txt\")");
-   assert(cofIgnoreList.empty() == false && "no entries in cofactor ignore definition (\"/tmp/cof_ignorelist.txt\")");
-
-   /* search cofactors */
+   const char* fn_cof_grp = getenv(ENV_COF_IGNORELIST);
+   const char* fn_cof_ign = getenv(ENV_COF_GROUPS);
+   cofIgnoreList = common::readList(fn_cof_ign);
+   if (cofIgnoreList.empty()) {
+      fprintf(stderr, "no entries in cofactor ignore list - check env var %s (\"%s\")\n", ENV_COF_GROUPS, fn_cof_grp);
+      exit(1);
+   }
    CofactorType ct;
-   assert(ct.readGroupDef("/tmp/cof_groups.txt") == true && "no entries read in cofactor group definition (\"/tmp/cof_groups.txt\")");
+   if (!ct.readGroupDef(fn_cof_grp)) {
+      fprintf(stderr, "no entries in cofactor group definition - check env var %s (\"%s\")\n", ENV_COF_GROUPS, fn_cof_grp);
+      exit(1);
+   }
    dbg.setPrefix("CofactorDetector B1:");
    CofactorDetector cdB1(pBC, mint.resR(), ConfigCompUnbound().minCofactorDistB, ConfigCompUnbound().minCofactorNeighborsB, ConfigCompUnbound().cofNeighborDist, cofIgnoreList, dbg);
    dbg.setPrefix("CofactorDetector B2:");
