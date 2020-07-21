@@ -270,6 +270,7 @@ static bool cmdChainCon(const std::string &fnPath, const std::string &fnList,
          auto last = std::min(pdbCodeList.size(), i + chunkSize);
          pdbCodeChunks.emplace_back(pdbCodeList.begin() + i, pdbCodeList.begin() + last);
       }
+      Log::inf("using %lu chunks with %u elements each", pdbCodeChunks.size(), chunkSize);
    }
 
    ChunkStatus cs;
@@ -358,6 +359,7 @@ static bool cmdChainGrp(const std::string &path, const std::string &fnList,
          auto last = std::min(pdbCodeList.size(), i + chunkSize);
          pdbCodeChunks.emplace_back(pdbCodeList.begin() + i, pdbCodeList.begin() + last);
       }
+      Log::inf("using %lu chunks with %u elements each", pdbCodeChunks.size(), chunkSize);
    }
 
    ChunkStatus cs;
@@ -450,6 +452,7 @@ static bool cmdChainSim(const std::string &path, const std::string &list,
       }
       Log::inf("prepared %6.3f%%", 100.0f * i / pdbCodes.size());
    }
+   Log::inf("using %lu chunks with %u elements each", cmpLists.size(), entriesPerList);
 
    ChunkStatus cs;
    cs.init(CMD_SIM, fnCheckpoint.c_str(), cmpLists.size());
