@@ -333,6 +333,7 @@ static bool cmdChainCon(const std::string &fnPath, const std::string &fnList,
       #pragma omp critical (cs)
       {
          cs.setCompleted(j);
+         Log::inf("processed %6.3f%%", cs.getProgress() * 100);
       }
    }
    return true;
@@ -402,6 +403,7 @@ static bool cmdChainGrp(const std::string &path, const std::string &fnList,
       #pragma omp critical (cs)
       {
          cs.setCompleted(j);
+         Log::inf("processed %6.3f%%", cs.getProgress() * 100);
       }
    }
    return true;
