@@ -379,7 +379,7 @@ static bool cmdChainSim(const std::string &path, const std::string &list,
    /* split to chunks */
    const char* ntstr = getenv("OMP_NUM_THREADS");
    const uint32_t nt = ntstr != NULL ? (uint32_t)strtol(ntstr, NULL, 10) : 4;
-   const uint32_t nchunk = 5000000 * nt; /* half of symm matrix (- diag) */
+   const uint32_t nchunk = 500000 * nt; /* half of symm matrix (- diag) */
    const uint32_t entriesPerList = (uint32_t)ceil(sqrtf(nchunk*2+0.5f)+0.5f); /* n of matrix */
 
    std::vector<std::pair<PdbCodes, PdbCodes> > cmpLists;
