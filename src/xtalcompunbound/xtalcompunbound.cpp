@@ -1011,17 +1011,21 @@ static UnboundMatchResult alignUnbound(const std::string &id, const std::string 
 
    // TODO: pre-read and share lists
    std::vector<std::string> cofIgnoreList;
-   const char* fn_cof_grp = getenv(ENV_COF_IGNORELIST);
-   const char* fn_cof_ign = getenv(ENV_COF_GROUPS);
-   cofIgnoreList = common::readList(fn_cof_ign);
-   if (cofIgnoreList.empty()) {
-      fprintf(stderr, "no entries in cofactor ignore list - check env var %s (\"%s\")\n", ENV_COF_GROUPS, fn_cof_grp);
-      exit(1);
+   {
+      const char* fn_cof_ign = getenv(ENV_COF_IGNORELIST);
+      cofIgnoreList = common::readList(fn_cof_ign);
+      if (cofIgnoreList.empty()) {
+         fprintf(stderr, "no entries in cofactor ignore list - check env var %s (\"%s\")\n", ENV_COF_GROUPS, fn_cof_ign);
+         exit(1);
+      }
    }
    CofactorType ct;
-   if (!ct.readGroupDef(fn_cof_grp)) {
-      fprintf(stderr, "no entries in cofactor group definition - check env var %s (\"%s\")\n", ENV_COF_GROUPS, fn_cof_grp);
-      exit(1);
+   {
+      const char* fn_cof_grp = getenv(ENV_COF_GROUPS);
+      if (!ct.readGroupDef(fn_cof_grp)) {
+         fprintf(stderr, "no entries in cofactor group definition - check env var %s (\"%s\")\n", ENV_COF_GROUPS, fn_cof_grp);
+         exit(1);
+      }
    }
    dbg.setPrefix("CofactorDetector B1:");
    CofactorDetector cdB1(pBC, mint.resR(), ConfigCompUnbound().minCofactorDistB, ConfigCompUnbound().minCofactorNeighborsB, ConfigCompUnbound().cofNeighborDist, cofIgnoreList, dbg);
