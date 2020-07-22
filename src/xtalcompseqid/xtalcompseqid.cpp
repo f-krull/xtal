@@ -200,41 +200,6 @@ static bool getChainSeqDescr(const std::string &fnPdbPath,
 
 /*----------------------------------------------------------------------------*/
 
-static bool cmpSim(const std::string &fnPdbPath,
-      const std::vector<std::string> &list1,
-      const std::vector<std::string> &list2, FILE *outfile) {
-   const bool merge = true;
-   /* read PDB lists */
-   std::vector<ChainSeqDescr> seqs1;
-   std::vector<ChainSeqDescr> seqs2;
-
-   bool ok = true;
-   #pragma omp critical (sim_read1)
-   {
-      ok = ok && getChainSeqDescr(fnPdbPath, list1, seqs1, merge);
-   }
-   #pragma omp critical (sim_read2)
-   {
-      ok = ok && getChainSeqDescr(fnPdbPath, list2, seqs2, merge);
-   }
-   if (ok == false) {
-      return false;
-   }
-
-   UnitScore us;
-   for (uint32_t i = 0; i < seqs1.size(); i++) {
-      for (uint32_t j = 0; j < seqs2.size(); j++) {
-         if (merge == true && (seqs1[i].pdbId < seqs2[j].pdbId) == false) {
-            continue;
-         }
-         compareSeq(seqs1[i], seqs2[j], us, outfile, merge);
-      }
-   }
-   return true;
-}
-
-/*----------------------------------------------------------------------------*/
-
 static bool cmdChainCon(const std::string &fnPath, const std::string &fnList, 
    const std::string &fnCheckpoint) {
    std::vector<std::vector<std::string>> pdbCodeChunks;
@@ -448,25 +413,38 @@ static bool cmdChainSim(const std::string &path, const std::string &list,
    }
 
    /* process lists */
-   bool ret = true; /* wont work yet with omp */
-   #pragma omp parallel for
+   bool ok = true; /* wont work yet with omp */
    for (uint32_t i = 0; i < cmpLists.size(); i++) {
       if (cs.isCompleted(i)) {
          continue;
       }
-      #pragma omp task
-      {
-         ret = ret && cmpSim(path, cmpLists[i].first, cmpLists[i].second, stdout);
-         if (ret) {
-            #pragma omp critical (cs)
-            {
-               cs.setCompleted(i);
-               Log::inf("processed %6.3f%%", cs.getProgress() * 100);
+
+      const bool merge = true;
+      /* read PDB lists */
+      std::vector<ChainSeqDescr> seqs1;
+      std::vector<ChainSeqDescr> seqs2;
+
+      bool ok = true;
+      ok = ok && getChainSeqDescr(path, cmpLists[i].first, seqs1, merge);
+      ok = ok && getChainSeqDescr(path, cmpLists[i].second, seqs2, merge);
+      if (!ok) break;
+
+      UnitScore us;
+      #pragma omp parallel for collapse(2) schedule(guided)
+      for (uint32_t i = 0; i < seqs1.size(); i++) {
+         for (uint32_t j = 0; j < seqs2.size(); j++) {
+            if (merge == true && (seqs1[i].pdbId < seqs2[j].pdbId) == false) {
+               continue;
             }
+            compareSeq(seqs1[i], seqs2[j], us, stdout, merge);
          }
       }
+      {
+         cs.setCompleted(i);
+         Log::inf("processed %6.3f%%", cs.getProgress() * 100);
+      }
    }
-   return ret;
+   return ok;
 }
 
 /*----------------------------------------------------------------------------*/
