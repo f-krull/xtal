@@ -9,6 +9,7 @@
 
 #include <stdio.h>
 #include <assert.h>
+#include <math.h>
 
 #define CFG_SEQ_MIN_LENGTH 20
 #define MIN_CHAIN_SIM 1.0f
@@ -375,8 +376,11 @@ static bool cmdChainSim(const std::string &path, const std::string &list,
    }
 
    
-   /* split to chunks of 400x400; use at least 4 chunks on smaller sets */
-   const uint32_t entriesPerList = std::min(400u, (uint32_t)(pdbCodes.size() / 4));
+   /* split to chunks */
+   const char* ntstr = getenv("OMP_NUM_THREADS");
+   const uint32_t nt = ntstr != NULL ? (uint32_t)strtol(ntstr, NULL, 10) : 4;
+   const uint32_t nchunk = 5000000 * nt; /* half of symm matrix (- diag) */
+   const uint32_t entriesPerList = (uint32_t)ceil(sqrtf(nchunk*2+0.5f)+0.5f); /* n of matrix */
 
    std::vector<std::pair<PdbCodes, PdbCodes> > cmpLists;
 
@@ -403,7 +407,7 @@ static bool cmdChainSim(const std::string &path, const std::string &list,
       }
       Log::inf("prepared %6.3f%%", 100.0f * i / pdbCodes.size());
    }
-   Log::inf("using %lu chunks with %u elements each", cmpLists.size(), entriesPerList);
+   Log::inf("using %ld threads and %lu chunks with %u elements each", nt, cmpLists.size(), entriesPerList);
 
    ChunkStatus cs;
    cs.init(CMD_SIM, fnCheckpoint.c_str(), cmpLists.size());
@@ -430,7 +434,7 @@ static bool cmdChainSim(const std::string &path, const std::string &list,
       if (!ok) break;
 
       UnitScore us;
-      #pragma omp parallel for collapse(2) schedule(guided)
+      #pragma omp parallel for collapse(2) schedule(dynamic)
       for (uint32_t i = 0; i < seqs1.size(); i++) {
          for (uint32_t j = 0; j < seqs2.size(); j++) {
             if (merge == true && (seqs1[i].pdbId < seqs2[j].pdbId) == false) {
