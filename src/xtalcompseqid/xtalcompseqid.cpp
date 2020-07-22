@@ -202,7 +202,8 @@ static bool getChainSeqDescr(const std::string &fnPdbPath,
 
 static bool cmpSim(const std::string &fnPdbPath,
       const std::vector<std::string> &list1,
-      const std::vector<std::string> &list2, FILE *outfile, bool merge) {
+      const std::vector<std::string> &list2, FILE *outfile) {
+   const bool merge = true;
    /* read PDB lists */
    std::vector<ChainSeqDescr> seqs1;
    std::vector<ChainSeqDescr> seqs2;
@@ -221,29 +222,12 @@ static bool cmpSim(const std::string &fnPdbPath,
    }
 
    UnitScore us;
-
-   uint64_t countTotal = 0;
-   for (uint32_t i = 0; i < seqs1.size(); i++) {
-      for (uint32_t j = 0; j < seqs2.size(); j++) {
-         if (merge == true && (seqs1[i].pdbId < seqs2[j].pdbId) == false) {
-            continue;
-         }
-         countTotal++;
-      }
-   }
-
-   uint64_t countCurr = 0;
    for (uint32_t i = 0; i < seqs1.size(); i++) {
       for (uint32_t j = 0; j < seqs2.size(); j++) {
          if (merge == true && (seqs1[i].pdbId < seqs2[j].pdbId) == false) {
             continue;
          }
          compareSeq(seqs1[i], seqs2[j], us, outfile, merge);
-         countCurr++;
-//        if (countCurr % 1000 == 0) {
-//           Log::inf("progress: %6.2f%% (%lu/%lu) chains",
-//                 100.0f * countCurr / countTotal, countCurr, countTotal);
-//        }
       }
    }
    return true;
@@ -464,21 +448,21 @@ static bool cmdChainSim(const std::string &path, const std::string &list,
    }
 
    /* process lists */
-   uint32_t numDone = 0;
    bool ret = true; /* wont work yet with omp */
    #pragma omp parallel for
    for (uint32_t i = 0; i < cmpLists.size(); i++) {
       if (cs.isCompleted(i)) {
          continue;
       }
-      #pragma omp task shared(numDone)
+      #pragma omp task
       {
-         ret = ret && cmpSim(path, cmpLists[i].first, cmpLists[i].second, stdout, true);
-         #pragma omp critical (cs)
-         {
-            numDone++;
-            cs.setCompleted(i);
-            Log::inf("processed %6.3f%%", cs.getProgress() * 100);
+         ret = ret && cmpSim(path, cmpLists[i].first, cmpLists[i].second, stdout);
+         if (ret) {
+            #pragma omp critical (cs)
+            {
+               cs.setCompleted(i);
+               Log::inf("processed %6.3f%%", cs.getProgress() * 100);
+            }
          }
       }
    }
