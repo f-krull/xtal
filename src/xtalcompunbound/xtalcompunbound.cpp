@@ -1015,7 +1015,7 @@ static UnboundMatchResult alignUnbound(const std::string &id, const std::string 
       const char* fn_cof_ign = getenv(ENV_COF_IGNORELIST);
       cofIgnoreList = common::readList(fn_cof_ign);
       if (cofIgnoreList.empty()) {
-         fprintf(stderr, "no entries in cofactor ignore list - check env var %s (\"%s\")\n", ENV_COF_GROUPS, fn_cof_ign);
+         fprintf(stderr, "no entries in cofactor ignore list - check env var %s (\"%s\")\n", ENV_COF_IGNORELIST, fn_cof_ign);
          exit(1);
       }
    }
@@ -1327,28 +1327,25 @@ int XtalCompUnbound::start() {
          if (cs.getProgress() > 0) {
             Log::inf("resuming at %.3f%%", cs.getProgress() * 100);
          }
-         #pragma omp parallel for
+         #pragma omp parallel for schedule(dynamic)
          for (uint32_t i = 0; i < candList.size(); i++) {
             if (cs.isCompleted(i)) {
                continue;
             }
-            #pragma omp task
+            const std::string fnpBC = dnPdb + candList[i][1] + ".pdb";
+            const char nB1 = candList[i][2].at(0);
+            const char nB2 = candList[i][3].at(0);
+            const std::string fnpU1 = dnPdb + candList[i][4] + ".pdb";
+            const char nU1 = candList[i][5].at(0);
+            std::string res;
+            startAlignUnbound(candList[i][0].c_str(), fnpBC, nB1, nB2, fnpU1, nU1, res);
+            #pragma omp critical
             {
-               const std::string fnpBC = dnPdb + candList[i][1] + ".pdb";
-               const char nB1 = candList[i][2].at(0);
-               const char nB2 = candList[i][3].at(0);
-               const std::string fnpU1 = dnPdb + candList[i][4] + ".pdb";
-               const char nU1 = candList[i][5].at(0);
-               std::string res;
-               startAlignUnbound(candList[i][0].c_str(), fnpBC, nB1, nB2, fnpU1, nU1, res);
-               #pragma omp critical
-               {
-                  printf("%s %s\n", candList[i][0].c_str(), res.c_str());
-                  fflush(stdout);
-                  cs.setCompleted(i);
-                  if (i%1000 == 0) {
-                     Log::inf("processed %6.3f%%", cs.getProgress() * 100);
-                  }
+               printf("%s %s\n", candList[i][0].c_str(), res.c_str());
+               fflush(stdout);
+               cs.setCompleted(i);
+               if (i%1000 == 0) {
+                  Log::inf("processed %6.3f%%", cs.getProgress() * 100);
                }
             }
          }
