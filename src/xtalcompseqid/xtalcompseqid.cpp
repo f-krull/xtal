@@ -175,11 +175,8 @@ void compareSeq(const ChainSeqDescr &csd1, const ChainSeqDescr &csd2,
 }
 
 /*----------------------------------------------------------------------------*/
-
-static bool getChainSeqDescr(const std::string &fnPdbPath,
-      const std::vector<std::string> &pdbCodeList,
-      std::vector<ChainSeqDescr> &csds, bool merge = false) {
-   csds.clear();
+std::vector<ChainSeqDescr> getChainSeqDescrAsync(const std::string &fnPdbPath, const std::vector<std::string> &pdbCodeList) {
+   std::vector<ChainSeqDescr> csds;
    uint64_t numChains = 0;
    /* read pdb files */
    for (uint32_t i = 0; i < pdbCodeList.size(); i++) {
@@ -188,15 +185,15 @@ static bool getChainSeqDescr(const std::string &fnPdbPath,
       if (p.readPdb((fnPdbPath + "/" + pdbCodeList[i] + ".pdb").c_str())
             == false) {
          csds.clear();
-         return false;
+         return csds;
       }
       /* use filename as name (pdb5) */
       p.name() = pdbCodeList[i];
-      numChains += addChainDescr(p, csds, merge);
+      numChains += addChainDescr(p, csds, true);
    }
    Log::inf("successfully read %lu pdb files (%lu chains %lu valid sequences)",
          pdbCodeList.size(), numChains, csds.size());
-   return true;
+   return csds;
 }
 
 /*----------------------------------------------------------------------------*/
@@ -361,6 +358,34 @@ static bool cmdChainGrp(const std::string &path, const std::string &fnList,
 
 /*----------------------------------------------------------------------------*/
 
+#include <future>
+
+struct SimChunkData {
+   std::vector<ChainSeqDescr> seqs1;
+   std::vector<ChainSeqDescr> seqs2;
+   uint32_t chunkId;
+   static SimChunkData prepare(const ChunkStatus &cs
+      ,uint32_t minChunkId
+      ,const std::vector<std::pair<std::vector<std::string>, std::vector<std::string>>> &cmpLists
+      ,const std::string &path
+   ) {
+      SimChunkData res;
+      res.chunkId = cmpLists.size();
+      /* search next uncompleted chunk */
+      for (uint32_t i = minChunkId; i < cmpLists.size(); i++) {
+         if (!cs.isCompleted(i)) {
+            res.chunkId = i;
+            break;
+         }
+      }
+      if (res.chunkId >= cmpLists.size()) {
+         return res;
+      }
+      res.seqs1 =  getChainSeqDescrAsync(path, cmpLists[res.chunkId].first);
+      res.seqs2 =  getChainSeqDescrAsync(path, cmpLists[res.chunkId].second);
+      return res;
+   }
+};
 
 static bool cmdChainSim(const std::string &path, const std::string &list,
       const std::string &fnCheckpoint) {
@@ -407,6 +432,10 @@ static bool cmdChainSim(const std::string &path, const std::string &list,
       }
       Log::inf("prepared %6.3f%%", 100.0f * i / pdbCodes.size());
    }
+   if (cmpLists.empty()) {
+      Log::err("nothing to compute");
+      return false;
+   }
    Log::inf("using %ld threads and %lu chunks with %u elements each", nt, cmpLists.size(), entriesPerList);
 
    ChunkStatus cs;
@@ -417,37 +446,42 @@ static bool cmdChainSim(const std::string &path, const std::string &list,
    }
 
    /* process lists */
-   bool ok = true; /* wont work yet with omp */
-   for (uint32_t i = 0; i < cmpLists.size(); i++) {
-      if (cs.isCompleted(i)) {
-         continue;
+   bool ok = true;
+   /* prefetch first chunk */
+   auto fcdat =  std::async(std::launch::async, SimChunkData::prepare, cs, 0, cmpLists, path);
+   /* while not completed */ 
+   while (true) {
+      auto cdat = fcdat.get();
+      if (cdat.chunkId >= cmpLists.size()) {
+         break;
       }
-
-      const bool merge = true;
-      /* read PDB lists */
-      std::vector<ChainSeqDescr> seqs1;
-      std::vector<ChainSeqDescr> seqs2;
-
-      bool ok = true;
-      ok = ok && getChainSeqDescr(path, cmpLists[i].first, seqs1, merge);
-      ok = ok && getChainSeqDescr(path, cmpLists[i].second, seqs2, merge);
-      if (!ok) break;
-
-      UnitScore us;
-      #pragma omp parallel for collapse(2) schedule(dynamic)
-      for (uint32_t i = 0; i < seqs1.size(); i++) {
-         for (uint32_t j = 0; j < seqs2.size(); j++) {
-            if (merge == true && (seqs1[i].pdbId < seqs2[j].pdbId) == false) {
-               continue;
+      /* prefetch next chunk (k+n) */
+      fcdat = std::async(std::launch::async, SimChunkData::prepare, cs, cdat.chunkId+1, cmpLists, path);
+      /* process chunk k */
+      {
+         const std::vector<ChainSeqDescr> &seqs1 = cdat.seqs1;
+         const std::vector<ChainSeqDescr> &seqs2 = cdat.seqs2;
+         ok = ok && !seqs1.empty();
+         ok = ok && !seqs2.empty();
+         if (!ok) { 
+            break;
+         }
+         UnitScore us;
+         #pragma omp parallel for collapse(2) schedule(dynamic)
+         for (uint32_t i = 0; i < seqs1.size(); i++) {
+            for (uint32_t j = 0; j < seqs2.size(); j++) {
+               if ((seqs1[i].pdbId < seqs2[j].pdbId) == false) {
+                  continue;
+               }
+               compareSeq(seqs1[i], seqs2[j], us, stdout, true);
             }
-            compareSeq(seqs1[i], seqs2[j], us, stdout, merge);
          }
       }
-      {
-         cs.setCompleted(i);
-         Log::inf("processed %6.3f%%", cs.getProgress() * 100);
-      }
+      /* save chunk status */
+      cs.setCompleted(cdat.chunkId);
+      Log::inf("processed %6.3f%%", cs.getProgress() * 100);
    }
+
    return ok;
 }
 
