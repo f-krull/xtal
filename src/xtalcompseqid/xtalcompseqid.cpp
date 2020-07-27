@@ -7,6 +7,7 @@
 #include "../libxtalcommon/chaininterfacetable.h"
 #include "../libxtalutil/chunkstatus.h"
 
+#include <future>
 #include <stdio.h>
 #include <assert.h>
 #include <math.h>
@@ -358,8 +359,6 @@ static bool cmdChainGrp(const std::string &path, const std::string &fnList,
 
 /*----------------------------------------------------------------------------*/
 
-#include <future>
-
 struct SimChunkData {
    std::vector<ChainSeqDescr> seqs1;
    std::vector<ChainSeqDescr> seqs2;
@@ -451,7 +450,9 @@ static bool cmdChainSim(const std::string &path, const std::string &list,
    auto fcdat =  std::async(std::launch::async, SimChunkData::prepare, cs, 0, cmpLists, path);
    /* while not completed */ 
    while (true) {
+      /* access prefetched data */
       auto cdat = fcdat.get();
+      /* done? */
       if (cdat.chunkId >= cmpLists.size()) {
          break;
       }

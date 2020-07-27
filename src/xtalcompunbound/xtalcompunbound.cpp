@@ -375,20 +375,6 @@ static float getAlignedInterface(const Chains &chainsB1, const Chains &chainsU1,
 
       /* align all residues */
       ResAligner::Alignment al = ResAligner::align(chainsB1[i]->resis(), chainsU1[i]->resis());
-#if 0
-      /* debug */
-      {
-         std::string alStr1;
-         std::string alStr2;
-
-         for (uint32_t k = 0; k < al.al1.size(); k++) {
-            alStr1.push_back(AaMap::getResn1(al.al1[k]->atoms()[0]->resName()));
-            alStr2.push_back(AaMap::getResn1(al.al2[k]->atoms()[0]->resName()));
-         }
-         dbg("B1-%c: %s", chainsB1[i]->name(), alStr1.c_str());
-         dbg("U1-%c: %s", chainsU1[i]->name(), alStr2.c_str());
-      }
-#endif
 
       /* count aligned interface residues */
       numalint = 0;
@@ -505,49 +491,6 @@ static std::string chains2Str_sorted(const Chains &c) {
    std::sort(s.begin(), s.end());
    return s;
 }
-
-/*----------------------------------------------------------------------------*/
-
-#if 0
-static bool hasChainSeqConfilct(const Protein &pBound,
-         const std::vector<std::string> &cBound2, const Protein &pUnbound,
-         const std::vector<std::string> &cUnbound1) {
-   std::vector<Chain*> selBound;
-   std::vector<Chain*> selUnbound;
-
-   selBound= getChainsByName(pBound, cBound2);
-   selUnbound = getChainsByName(pUnbound, cUnbound1);
-
-   assert(selBound.size());
-   assert(selUnbound.size());
-
-   for (uint32_t i = 0; i < selBound.size(); i++) {
-      std::string seqBound = Residue::getResSequence(selBound[i]->resis());
-      /* happens if chain has no amino acid residues */
-      if (seqBound.size() == 0) {
-         continue;
-      }
-      for (uint32_t j = 0; j < selUnbound.size(); j++) {
-         std::string seqUnbound = Residue::getResSequence(
-                  selUnbound[i]->resis());
-         /* happens if chain has no amino acid residues */
-         if (seqUnbound.size() == 0) {
-            continue;
-         }
-
-         /* is any Bound2 chain part of any Unbound chain? */
-         float seqid = getSeqIdDirected(seqBound, seqUnbound);
-         if (seqid >= MAXSEQID) {
-         Log::dbg("seqid bound_forbidden %2u with unbound %2u: %5.2f chainlengths: %lu, %lu", i ,j, seqid, seqBound.size(),
-                  seqUnbound.size());
-
-            return true;
-         }
-      }
-   }
-   return false;
-}
-#endif
 
 /*----------------------------------------------------------------------------*/
 
@@ -879,9 +822,6 @@ static UnboundMatchResult alignUnbound(const std::string &id, const std::string 
    res.seedPBC = common::removeExtension(common::removePath(fnpBC));
    res.seedPU1 = common::removeExtension(common::removePath(fnpU1));
 
-
-
-
    /* check PDB structures for CA only chains */
    if (checkBackbones(pBC, dbg) == false) {
       res.status |= UnboundMatchResult::ERR_BACKBONEB;
@@ -893,7 +833,6 @@ static UnboundMatchResult alignUnbound(const std::string &id, const std::string 
    }
 
 
-
    /* check PDB structures for self clashes (1dfj has wrong biounit) */
    if (checkChainClashes(pBC, dbg) == false) {
       res.status |= UnboundMatchResult::ERR_CHAINCLASHES;
@@ -903,8 +842,6 @@ static UnboundMatchResult alignUnbound(const std::string &id, const std::string 
       res.status |= UnboundMatchResult::ERR_CHAINCLASHES;
       return res;
    }
-
-
 
 
    /* check interface size of B1:B2 */
@@ -951,8 +888,6 @@ static UnboundMatchResult alignUnbound(const std::string &id, const std::string 
       res.status |= UnboundMatchResult::ERR_DNA;
       return res;
    }
-
-
 
    /* superimposition and interface RMSD */
    Residues intB1; /* aligned interface */
@@ -1009,7 +944,7 @@ static UnboundMatchResult alignUnbound(const std::string &id, const std::string 
       }
    }
 
-   // TODO: pre-read and share lists
+   // TODO optimize: pre-read and share cofactor lists
    std::vector<std::string> cofIgnoreList;
    {
       const char* fn_cof_ign = getenv(ENV_COF_IGNORELIST);
@@ -1143,88 +1078,6 @@ static UnboundMatchResult alignUnbound(const std::string &id, const std::string 
    } else {
       sState += "irmsd";
    }
-
-   /* visualize */
-#ifdef HAS_VIEWER   
-   #pragma omp critical
-   if (Viewer::getInstance().isRunning() == true) {
-      Viewer::getInstance().remAll();
-      Model *mdl;
-      // set rotation and zoom
-      {
-         Orientator ori;
-         ori.add(cmx.B1());
-         ori.add(cmx.U1());
-         ori.orient();
-      }
-      // focus on interface
-      {
-         Vector cen;
-         cen += Residue::caCentre(mint.resR());
-         cen += Residue::caCentre(mint.resL());
-         cen /= 2;
-         Viewer::getInstance().setCentre(cen);
-      }
-
-      for (uint32_t i = 0; i < cmx.B1().size(); i++) {
-         RgbColor col = RgbColor(0x4488FF);
-         mdl = new GlSseModel(*(cmx.B1()[i]), col);
-         Viewer::getInstance().addModel(mdl);
-      }
-
-      for (uint32_t i = 0; i < cmx.B2().size(); i++) {
-         RgbColor col = RgbColor(0x4444FF);
-         mdl = new GlSseModel(*(cmx.B2()[i]), col);
-         Viewer::getInstance().addModel(mdl);
-      }
-
-      for (uint32_t i = 0; i < cmx.U1().size(); i++) {
-         RgbColor col = RgbColor(0x44FF44);
-         mdl = new GlSseModel(*(cmx.U1()[i]), col);
-         Viewer::getInstance().addModel(mdl);
-      }
-
-      for (uint32_t i = 0; i < cmx.UX().size(); i++) {
-         RgbColor col = RgbColor(0xCCFFCC);
-         mdl = new GlSseModel(*(cmx.UX()[i]), col);
-         Viewer::getInstance().addModel(mdl);
-      }
-
-      for (uint32_t i = 0; i < cmx.UC().size(); i++) {
-         RgbColor col = RgbColor(0xFFFF44);
-         mdl = new GlSseModel(*(cmx.UC()[i]), col);
-         Viewer::getInstance().addModel(mdl);
-      }
-
-      for (uint32_t i = 0; i < cmx.US().size(); i++) {
-         RgbColor col = RgbColor(0xFFFF88);
-         mdl = new GlSseModel(*(cmx.US()[i]), col);
-         Viewer::getInstance().addModel(mdl);
-      }
-
-      for (uint32_t i = 0; i < cmx.BX().size(); i++) {
-         RgbColor col = RgbColor(0x8888FF);
-         mdl = new GlSseModel(*(cmx.BX()[i]), col);
-         Viewer::getInstance().addModel(mdl);
-      }
-
-      for (uint32_t i = 0; i < cmx.BS().size(); i++) {
-         RgbColor col = RgbColor(0xCC88FF);
-         mdl = new GlSseModel(*(cmx.BS()[i]), col);
-         Viewer::getInstance().addModel(mdl);
-      }
-
-      RgbColor col;
-      col = RgbColor::DEEPPINK;
-      col.t() = 0.25;
-      mdl = new SticksModel(pU1.nonResis(), AtmColorer(col, RgbColor::PURPLE));
-      Viewer::getInstance().addModel(mdl);
-
-      SDL_Delay(50);
-      cmd.setVar("viewer.screenshotfile", common::s_printf("/tmp/xtal_%s_%s-%s_%s_%s_%s.tga", sState.c_str(), pBC.name().c_str(), res.cChainsB1.c_str(), res.cChainsB2x.c_str(), pU1.name().c_str(), res.uChainsU1x.c_str()));
-      Viewer::getInstance().screenshot();
-   }
-#endif   
 	return res;
 }
 
@@ -1283,7 +1136,7 @@ void XtalCompUnbound::registerStuff() {
 
 int XtalCompUnbound::start() {
    int ret = 1;
-   if (cmd.getNumArgs() == 5 || cmd.getNumArgs() == 6) {
+   if (cmd.getNumArgs() == 5) {
       const std::string fnpBC = cmd.getArgStr(0);
       const char nB1 =  cmd.getArgStr(1).at(0);
       const char nB2 =  cmd.getArgStr(2).at(0);
@@ -1292,14 +1145,7 @@ int XtalCompUnbound::start() {
 
       std::string res;
       ret = startAlignUnbound("0", fnpBC, nB1, nB2, fnpU1, nU1, res) ? 0 : 1;
-      printf("%s", res.c_str());
-#ifdef HAS_VIEWER         
-      /* auto mode? */
-      bool autoMode = (cmd.getNumArgs() >= 6 && cmd.getArgStr(5) == "auto");
-      if (Viewer::getInstance().isRunning() && autoMode == true) {
-         Viewer::getInstance().stop(0);
-      }
-#endif      
+      printf("%s", res.c_str());   
    } else if (cmd.getNumArgs() == 2 || cmd.getNumArgs() == 3) {
       const std::string dnPdb = cmd.getArgStr(0);
       const std::string fnList = cmd.getArgStr(1);
@@ -1310,59 +1156,40 @@ int XtalCompUnbound::start() {
       /* remove header */
       candList.erase(candList.begin());
 
-      if (candList.empty() == false) {
-         ret = 0;
+      if (candList.empty()) {
+         return 0;
       }
-
-#ifdef HAS_VIEWER     
-      bool quit = false;
-#endif      
-
-      /* when viewing do not process parallel */
-      //const uint32_t chunkSize = cmd.var("viewer").getBool() == true ? 1 : 1024;
-      {
-         ChunkStatus cs;
-         cs.init(getName(), fnCheckpoint.c_str(), candList.size());
-         cs.load();
-         if (cs.getProgress() > 0) {
-            Log::inf("resuming at %.3f%%", cs.getProgress() * 100);
+      ChunkStatus cs;
+      cs.init(getName(), fnCheckpoint.c_str(), candList.size());
+      cs.load();
+      if (cs.getProgress() > 0) {
+         Log::inf("resuming at %.3f%%", cs.getProgress() * 100);
+      }
+      #pragma omp parallel for schedule(dynamic)
+      for (uint32_t i = 0; i < candList.size(); i++) {
+         if (cs.isCompleted(i)) {
+            continue;
          }
-         #pragma omp parallel for schedule(dynamic)
-         for (uint32_t i = 0; i < candList.size(); i++) {
-            if (cs.isCompleted(i)) {
-               continue;
-            }
-            const std::string fnpBC = dnPdb + candList[i][1] + ".pdb";
-            const char nB1 = candList[i][2].at(0);
-            const char nB2 = candList[i][3].at(0);
-            const std::string fnpU1 = dnPdb + candList[i][4] + ".pdb";
-            const char nU1 = candList[i][5].at(0);
-            std::string res;
-            startAlignUnbound(candList[i][0].c_str(), fnpBC, nB1, nB2, fnpU1, nU1, res);
-            #pragma omp critical
-            {
-               printf("%s %s\n", candList[i][0].c_str(), res.c_str());
-               fflush(stdout);
-               cs.setCompleted(i);
-               if (i%1000 == 0) {
-                  Log::inf("processed %6.3f%%", cs.getProgress() * 100);
-               }
+         const std::string fnpBC = dnPdb + candList[i][1] + ".pdb";
+         const char nB1 = candList[i][2].at(0);
+         const char nB2 = candList[i][3].at(0);
+         const std::string fnpU1 = dnPdb + candList[i][4] + ".pdb";
+         const char nU1 = candList[i][5].at(0);
+         std::string res;
+         startAlignUnbound(candList[i][0].c_str(), fnpBC, nB1, nB2, fnpU1, nU1, res);
+         #pragma omp critical
+         {
+            printf("%s %s\n", candList[i][0].c_str(), res.c_str());
+            fflush(stdout);
+            cs.setCompleted(i);
+            if (i%1000 == 0) {
+               Log::inf("processed %6.3f%%", cs.getProgress() * 100);
             }
          }
-#ifdef HAS_VIEWER            
-         if (cmd.var("viewer").getBool() == true && Viewer::getInstance().isRunning() == false) {
-            quit = true;
-         }
-#endif         
-      }
-
+      }  
    } else {
-      Log::err("usage: %s  PDB_BC CHAIN_B1 CHAIN_B2 PDB_U1 CHAIN_U1 [auto]", getName());
+      Log::err("usage: %s  PDB_BC CHAIN_B1 CHAIN_B2 PDB_U1 CHAIN_U1", getName());
       Log::err("   checks aligns unbound structure to complex", getName());
-#ifdef HAS_VIEWER         
-      Viewer::getInstance().stop(0);
-#endif
    }
-
    return ret;
 }
