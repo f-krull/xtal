@@ -200,18 +200,19 @@ DistanceMatrix<T>* DistanceMatrixFactory<T>::getFilled(std::vector<U> *elements,
      maxnumdist = (*dm).getNumElements() * (*dm).getNumElements();
      maxnumdist += (*dm).getNumElements();
      maxnumdist /= 2;
-     //# pragma omp single
      for (uint32_t i = 0; i < (*dm).getNumElements(); i++) {
-        #pragma omp parallel for shared(numdist)
+        #pragma omp parallel for schedule(dynamic)
         for (uint32_t j = i + 1; j < (*dm).getNumElements(); j++) {
-           (*dm)(i, j) = cmp((*elements)[i], (*elements)[j]);
+            const T dist = cmp((*elements)[i], (*elements)[j]);
+            (*dm)(i, j) = dist;
+           # pragma omp critical (dmres) 
+           {
+            numdist++;
 
-           # pragma omp atomic
-           numdist++;
-
-           if (numdist % 1000 == 0) {
-              Log::dbg("distance matrix calculated %u/%u distances", numdist,
-                    maxnumdist);
+            if (numdist % 1000 == 0) {
+               Log::dbg("distance matrix calculated %u/%u distances", numdist,
+                     maxnumdist);
+            }
            }
         }
      }
