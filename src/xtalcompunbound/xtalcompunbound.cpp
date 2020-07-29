@@ -1135,7 +1135,6 @@ void XtalCompUnbound::registerStuff() {
 /*----------------------------------------------------------------------------*/
 
 int XtalCompUnbound::start() {
-   int ret = 1;
    if (cmd.getNumArgs() == 5) {
       const std::string fnpBC = cmd.getArgStr(0);
       const char nB1 =  cmd.getArgStr(1).at(0);
@@ -1144,8 +1143,9 @@ int XtalCompUnbound::start() {
       const char nU1 =  cmd.getArgStr(4).at(0);
 
       std::string res;
-      ret = startAlignUnbound("0", fnpBC, nB1, nB2, fnpU1, nU1, res) ? 0 : 1;
+      int ret = startAlignUnbound("0", fnpBC, nB1, nB2, fnpU1, nU1, res) ? 0 : 1;
       printf("%s", res.c_str());   
+      return ret;
    } else if (cmd.getNumArgs() == 2 || cmd.getNumArgs() == 3) {
       const std::string dnPdb = cmd.getArgStr(0);
       const std::string fnList = cmd.getArgStr(1);
@@ -1157,7 +1157,7 @@ int XtalCompUnbound::start() {
       candList.erase(candList.begin());
 
       if (candList.empty()) {
-         return 0;
+         return 1;
       }
       ChunkStatus cs;
       cs.init(getName(), fnCheckpoint.c_str(), candList.size());
@@ -1186,10 +1186,11 @@ int XtalCompUnbound::start() {
                Log::inf("processed %6.3f%%", cs.getProgress() * 100);
             }
          }
-      }  
+      }
+      return 0;  
    } else {
       Log::err("usage: %s  PDB_BC CHAIN_B1 CHAIN_B2 PDB_U1 CHAIN_U1", getName());
       Log::err("   checks aligns unbound structure to complex", getName());
    }
-   return ret;
+   return 1;
 }
