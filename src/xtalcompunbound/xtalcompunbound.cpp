@@ -196,7 +196,7 @@ public:
       res += common::s_printf("%4s ", uChainsU1x.c_str());
 
       for (uint32_t i = 0; i < rotTrans.size(); i++) {
-         res += common::s_printf("%6.2f ", rotTrans[i]);
+         res += common::s_printf("%.6g ", rotTrans[i]);
       }
 
       res += common::s_printf("%s ", cofStr.c_str());
