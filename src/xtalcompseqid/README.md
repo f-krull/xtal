@@ -7,3 +7,4 @@ With these three tables one can generate a list of potential protein complexes w
 
 * Runs in parallel (using openmp) on all available cores
 * Chunk size is optimized to avoid concurrent reads
+* Uses checkpointing (`TMPDIR` and checkpoint file need to be on the same file system)
